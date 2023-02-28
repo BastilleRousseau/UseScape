@@ -1,0 +1,11 @@
+Package: UseScape
+Title: Clustering of movement metrics to create a spatial representation of the type of use an animal makes on the landscape
+Version: 0.0.0.1
+Authors@R: person("Guillaume", "Bastille-Rousseau", email="gbr@siu.edu", role = c("aut", "cre"))
+Description: Extraction of properties related to intensity of use such as the number of visits, the average and variation in time spent, and the average and variation in interval between visits. UseScape then combines and synthesizes these properties into a single spatial representation of the type of use an animal makes on the landscape. Spatial representation of use takes previously extracted movement data and clusters them using mixture-modeling. This visual representation informs users on the functional role a location plays for their species of interest. 
+Depends: adehabitatLT, mclust, moveHMM
+License: GPL-3
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.3
+
