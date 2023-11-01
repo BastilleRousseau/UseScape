@@ -1,0 +1,105 @@
+---
+title: "Vignette UseScape"
+author: "Guillaume Bastille-Rousseau"
+date: "November 1, 20223"
+output:
+  pdf_document: default
+  html_document: default
+---
+``` {r eval=T, echo=F, message=F, warning=F}
+library(adehabitatLT)
+library(raster)
+library(mclust)
+library(moveHMM)
+source("C:/Users/Guillaume/OneDrive - Southern Illinois University/SIU/Analyses/UseScape/UseScape/R/usescape_PACKAGE.R")
+```
+
+This vignette presents a simple workflow to extract the UseScape of GPS tracked individuals. We recommend interest readers read the documentation associated to the *UseScape* package for more examples.
+
+# A- Data preparation
+For simplification, we initiate the analysis with a simple trajectory object of class *ltraj*. This trajectory object is freely available in the *adehabitatLT* package and contains the GPS locations of 6 albatrosses. 
+``` {r eval=T}
+#library(devtools)
+#install_github("BastilleRousseau/UseScape")
+#library(UseScape)
+data(albatross)
+plot(albatross)
+```
+
+# B- UseScape of a single albatross 
+
+## 1- Selection of a grid size 
+We first investigate potential grid size to extract the timing history. We test the two approaches suggested in the manuscript; median step length, and a grid size that maximizes the variance in residency time. Luckily, both approaches converge at around 30,000m, which we will use in the next step.  
+
+``` {r eval=T}
+#Median step length
+quantile(ld(albatross[1])$dist, na.rm=T) #Extract quartile of step length
+
+#Variance in residency time calculation
+res_test(na.omit(albatross[1]), res_seq=seq(10000, 50000, 10000))  
+```
+
+
+## 2- Evaluating timing history 
+We use the function *traj2timing* to extract a timing history which corresponds of the entrance and exit times of an individual in each pixel for each visit. The function return a list of two elements, the first is a list of timing history of every pixel (note that the majority were never visited), the second element of the list is the reference grid. 
+``` {r eval=T}
+timing_ls<-traj2timing(na.omit(albatross[1]), res=30000, grid=NULL)
+timing_ls[[1]][2334:2339] #Example of the timing history of a few pixels
+plot(timing_ls[[2]]) #The reference grid 
+
+```
+
+## 3 - Extracting timing metrics 
+We then use *timing2stack* to convert the timing history into a series of metrics that can be displayed spatially. The object returned by the function is a raster stack. The function offers the option of selecting the unit of the time we want displayed. Note that selection here will be carried forward in other steps. 
+``` {r eval=T}
+stck<-timing2stack(timing_ls, unit_time = "hours") 
+plot(stck)
+```
+
+## 4- Clustering
+Once the stack object is created, *clust_use* can be use to perform an unsupervised classification. The argument *col* allows the selection of the metrics to be integrated (based on the order of the stack object), *nb_clust* provides a range of cluster numbers to be tested, and *min_fix* set a threshold for how many times a pixel need to be visited to be integrated in the analysis. A minimum of three visits is required for the coefficient of variation interval metric to be calculated. Values outputted represent the center of each cluster according to each metric and the last row present the proportion of each cluster. Values are scaled and centered around zero.In the case of this albatross, cluster 1 represent a cluster that is rarely visited and use very little relative to the other cluster based on the center of each metric.   
+``` {r eval=T}
+cluster<-clust_use(stck, col=c(1,2,3,4,6,7), nb_clust=1:9, min_fix=3)  
+```
+
+## 5- Backtransformation 
+The output of *clust_use* are standardized (1 SD) and centered (around zero). At time, it may be easier to see the values on their original scale (according to argument set with *timing2stack*). The function *backscaling_clust_use* can be used for this. Note that arguments most parallel arguments in *clust_use*. 
+``` {r eval=T}
+backscaled_cluster<-backscaling_clust_use(stck, cluster, col=c(1,2,3,4,6,7), min_fix=3) 
+```
+
+# C- Population-level clustering
+
+## 1- Looping over all individuals 
+The previous example focuses on a single individual. A two-steps clustering approach similar to what is presented in Bastille-Rousseau et al. (2021) Con. Bio can also be used to generate population results. The *loop_id* function loops the *traj2timing* and *timing2stack* over all individuals of a *traj* object using the same grid size. 
+``` {r eval=T}
+traj<-na.omit(albatross)
+ls1<-loop_id(traj, res=30000)
+table<-table_cluster(traj, ls1)
+
+#Showing the first few rows of the table created. 
+head(table)
+```
+
+## 2- Individual-level clustering 
+The first step of the analysis is to apply the clustering to each individual. *ind_clust* applies a mixture model to each individual. The same arguments can be passed as in *clust_use*. *ind_clust* simply return a list object with each element representing a single individual. 
+
+``` {r eval=T}
+ind<-ind_clust(table)
+```
+
+## 3- Population-level clustering 
+After performing the individual clustering, a second clustering is applied via *pop_clust*. This second clustering takes the output of *ind_clust* and will identify which individual clusters could be considered as one population-level clusters. The function automatically selects the optimal number of clusters (based on BIC). It is possible for two clusters from the same individual to be in the same population-level cluster. Likewise, it is possible that a population level cluster does not have all individuals. Here, five different population clusters were calculated. The center (mean) of each cluster and proportion of each cluster is output by default. 
+``` {r eval=T}
+pop<-pop_clust(traj, ind)
+```
+
+
+## 4- Mapping results 
+After performing the population level cluster, the function  *clust_stack* recombines the individual and population level clustering and produce a *stack* object for each individual albatross showing the most likely cluster, and also the probability of observing each cluster (uncertainty) in any given pixel. These object can be exported to be used in other software using the *writeRaster* function. 
+
+``` {r eval=T}
+stack<-clust_stack(ls1, pop, ind, table, min_fix = 3)
+plot(stack[[1]][[1]]) #Plot first individuals 
+plot(stack[[2]][[1]]) #Plot second individuals
+```

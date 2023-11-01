@@ -268,6 +268,38 @@ out<-list(clust, ras1, ras2)
 return(out)
 }
 
+
+#' @title Function for scaling back centers (means) of clusters to actual values 
+#' @description Convert the centers (means) of clusters to original scale
+#' @details The function reverse-standardize (*sd+mean) the values of the centers of each cluster. 
+#' 
+#' @param stck  stack that is produced from timing2stack
+#' @param clust output produced by clust_use 
+#' @param col specific parameters to be used ("Number visits", "Total duration", "Mean duration", "CV duration", "SD duration", "Mean interval", "CV interval", "SD interval"). By default, the function exclude SD Duration and SD interval. 
+#' @param nb_clust select the range of possible clusters that may be identified 
+#' @param min_fix set the minimum number of fixes within a cell for it to be included in the clustering (3 is the minimum when considering cv_duration and cv_interval)
+#' @keywords 
+#' @returns return matrix of the cluster centers on their original sclaes 
+#' @examples 
+#' traj1<-sim_mov(type="OU", npatches=3, grph=T)
+#' timing_ls<-traj2timing(traj1, res=50, grid=NULL)
+#' stck<-timing2stack(timing_ls, col=c(1,2,3,4,6,7), col=c(1,2,3,4,6,7), min_fix=3) 
+#' test<-clust_use(stck)
+#' backscaling_clust_use(stck, test, col=c(1,2,3,4,6,7), min_fix=3)
+#' 
+#' @export
+backscaling_clust_use<-function(stck, clust, col=c(1,2,3,4,6,7), min_fix=3) {
+  data<-values(stck)  
+  data<-data[,col]
+  avg<-colMeans(data[data[,1]>=min_fix,])
+  sd<-apply(data[data[,1]>=min_fix,], 2, sd)
+  tt<-clust[[1]]$parameters$mean*sd+avg
+  print(tt)
+  return(tt)
+}
+  
+
+
 #' @title Mask uncertain pixel from classification
 #' @description Remove pixel with uncertainty higher than a specific value from a plot
 #' @details Remove pixel with uncertainty higher than a specific value from a plot
@@ -424,7 +456,7 @@ ind_clust<-function(table, nb_clust=1:5, min_fix=3, vars=c("Number.visits", "Tot
 #' stack<-clust_stack(ls1, pop, ind, table, min_fix = 3)
 #' plot(stack[[1]][[1]]) #Plot first individuals 
 #' plot(stack[[2]][[1]]) #Plot second individuals 
-pop_clust<-function(traj, ls, n_clust=1:5) {
+pop_clust<-function(traj, ls, nb_clust=1:5) {
   id<-unique(adehabitatLT::id(traj))
   nvar<-nrow(ls[[1]]$parameters$mean)
   coef<-data.frame()
@@ -514,4 +546,6 @@ clust_stack<-function(ls1, pop, ind, table, min_fix=3) {
   }
   return(out_ls)
 }
+
+
 
